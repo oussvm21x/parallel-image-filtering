@@ -4,8 +4,8 @@
 #include <unistd.h>     // for close
 #include <stdio.h>      // for perror
 #include <errno.h>      // for errno
-
-
+#include <sys/types.h>
+#include <sys/stat.h>  // <--- Required for mkfifo
 
 /* ---1. Implemntation of  FIFOs ( Tubes ) */
 

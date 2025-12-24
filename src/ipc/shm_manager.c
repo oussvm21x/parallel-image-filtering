@@ -4,8 +4,7 @@
 #include <sys/stat.h>   // for S_IRUSR, S_IWUSR
 #include <unistd.h>     // for ftruncate, close
 #include <stdlib.h>     // for EXIT_FAILURE, exit
-
-
+#include <stdio.h>      // for perror
 
 /* ---1. Implementation of shared memory management functions */
 
