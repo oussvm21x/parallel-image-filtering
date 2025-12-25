@@ -4,9 +4,11 @@
 #include "image_api.h"
 #include <pthread.h>
 
-// Filter IDs
+/* --- 1. Filter Types ---*/
 #define FILTER_GRAYSCALE 1
-#define FILTER_NEGATIVE  2
+#define FILTER_NEGATIVE 2
+#define FILTER_BLUR 3
+
 
 // Concurrency Configuration
 // We use 4 threads

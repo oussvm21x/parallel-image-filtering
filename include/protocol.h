@@ -15,14 +15,7 @@
 
 
 
-
-/* --- 2. Filter Types ---*/
-#define FILTER_GRAYSCALE 1
-#define FILTER_NEGATIVE 2
-#define FILTER_BLUR 3
-
-
-/* --- 3. Request Structure ---*/
+/* --- 2. Request Structure ---*/
 // Given by the teacher
 typedef struct filter_request {
 pid_t pid ;
