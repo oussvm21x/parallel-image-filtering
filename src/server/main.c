@@ -14,8 +14,9 @@ sem_t  * global_sem = NULL ;
 int server_running = 1 ;
 
 
-/* --- Temp func declaration ---*/
-void worker_main(filter_request_t request) ;
+/* --- 2. Forward Declaration ---*/
+// We tell the compiler: "Trust me, this function exists in another file (worker_core.c)"
+void worker_core(filter_request_t req) ; 
 
 /* ---2. Signal Handler ---*/
 // Handler for SIGINT 
@@ -100,7 +101,7 @@ int main(int argc, char* argv[]) {
                     exit(EXIT_FAILURE) ;
                 case 0  :
                     // Child process (worker)
-                    worker_main(local_request) ;
+                    worker_core(local_request) ;
                     exit(EXIT_SUCCESS) ;
                 
                 default :
@@ -125,15 +126,6 @@ int main(int argc, char* argv[]) {
     printf("Server has shut down gracefully.\n");
     return 0 ;
 
-}
-
-
-/* Temporary worker function */
-void worker_main(filter_request_t request) {
-    printf("[Worker %d] Processing request for image: %s with filter %d\n", getpid(), request.chemin, request.filtre);
-    // Simulate processing time
-    sleep(2) ;
-    printf("[Worker %d] Finished processing request for image: %s\n", getpid(), request.chemin);
 }
 
 

@@ -82,7 +82,8 @@ image_t* load_image(const char* filepath) {
     BMPInfoHeader infoHeader;
 
     // 1. Read BMP Header
-    if( fread(&header, sizeof(BMPHeader), 1, f) == -1 || fread(&infoHeader, sizeof(BMPInfoHeader), 1, f) == -1 ) {
+    if (fread(&header, sizeof(BMPHeader), 1, f) != 1 || 
+    fread(&infoHeader, sizeof(BMPInfoHeader), 1, f) != 1) {
         perror("[BMP] Error reading BMP header");
         fclose(f);
         exit(EXIT_FAILURE);
