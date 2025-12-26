@@ -29,7 +29,7 @@ void worker_core(filter_request_t req) {
             break;
     
         case FILTER_NEGATIVE : 
-            printf("[Worker %d] Negative filter not implemented yet\n", getpid());
+            apply_negative(img) ;
             break;
     }
 
