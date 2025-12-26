@@ -31,6 +31,9 @@ void worker_core(filter_request_t req) {
         case FILTER_NEGATIVE : 
             apply_negative(img) ;
             break;
+        case FILTER_SEPPIA :
+            apply_seppia(img) ;
+            break ;
     }
 
     // 3. Open response FIFO (Pipe) 

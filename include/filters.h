@@ -7,6 +7,7 @@
 /* --- 1. Filter Types ---*/
 #define FILTER_GRAYSCALE 1
 #define FILTER_NEGATIVE 2
+#define FILTER_SEPPIA 3
 
 
 
