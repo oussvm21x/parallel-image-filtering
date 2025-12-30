@@ -71,7 +71,7 @@ void write_bmp_header ( FILE *f , int w , int h , int stride ) {
 /* --- 3. Image API --- */
 
 /* --- 3.1 Load image --- */
-image_t* load_image(const char* filepath) {
+image_t* load_bmp(const char* filepath) {
     FILE* f = fopen(filepath, "rb");
     if (!f) {
         perror("[BMP] Error opening file");
@@ -126,7 +126,7 @@ image_t* load_image(const char* filepath) {
 }
 
 /* --- 3.2 Save image --- */
-int save_image(const char* filepath, const image_t* img) {
+int save_bmp(const char* filepath, const image_t* img) {
     FILE* f = fopen(filepath , "wb");
     if (!f) {
         perror("[BMP] Error opening file for writing");

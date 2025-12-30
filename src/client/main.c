@@ -141,7 +141,20 @@ int main( int argc , char* argv[]) {
 
     // 8. Save the received image to disk
     char output_path[300];
-    snprintf(output_path, sizeof(output_path), "output_%d.png", getpid());
+
+    // 8.1 Get the extension from the input image path
+    const char* ext = strrchr(image_path, '.');
+    if (!ext) {
+        perror("[Client] Error: Input image path does not have an extension");
+        free_image(img);
+        close(fifo_fd);
+        unlink(fifo_path);
+        exit(EXIT_FAILURE);
+    }
+
+
+
+    snprintf(output_path, sizeof(output_path), "output_%d%s", getpid(), ext);
     if (save_image(output_path, img) != 0) {
         fprintf(stderr, "[Client %d] Error saving image to %s\n", getpid(), output_path);
     }

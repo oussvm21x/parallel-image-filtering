@@ -22,11 +22,45 @@ typedef struct {
 
 /* --- 2. Image I/O Functions ---*/
 
+/* --- 2.1 Loading and Saving Generic Images --- */
+
 // Load an image from a file on the disk 
 image_t* load_image(const char* filepath);
 
 // Save an image to a file on the disk
 int save_image(const char* filepath, const image_t* img);
+
+
+
+/* --- 2.2 Loading and Saving BMP Images --- */
+
+// Load a BMP image from a file on the disk
+image_t* load_bmp(const char* filepath);
+
+// Save a BMP image to a file on the disk
+int save_bmp(const char* filepath, const image_t* img);
+
+
+
+/* --- 2.3 Loading and Saving JPEG Images --- */
+
+// Load a JPEG image from a file on the disk
+image_t* load_jpeg(const char* filepath);
+
+// Save a JPEG image to a file on the disk
+int save_jpeg(const char* filepath, const image_t* img);
+
+
+
+/* --- 2.4 Loading and Saving PNG Images --- */
+
+// Load a PNG image from a file on the disk
+image_t* load_png(const char* filepath);
+
+// Save a PNG image to a file on the disk
+int save_png(const char* filepath, const image_t* img);
+
+
 
 /* --- 3. Image Memory Management ---*/
 

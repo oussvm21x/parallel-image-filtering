@@ -8,7 +8,7 @@ CC = gcc
 # -Iinclude: Look for headers in the 'include' folder
 # -g: Add debug symbols (useful for gdb/valgrind)
 CFLAGS = -Wall -Wextra -pthread -Iinclude -g
-LDFLAGS = -lrt -pthread -lm
+LDFLAGS = -lrt -pthread -lm -lz -ljpeg
 
 # Directories
 SRC_DIR = src
