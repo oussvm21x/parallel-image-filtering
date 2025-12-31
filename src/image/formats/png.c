@@ -168,3 +168,60 @@ int save_png(const char *filepath , const image_t *img) {
     return 0;
 }
     
+
+/* --- 3.2 Load Image --- */
+image_t* load_png(const char *filepath) {
+
+    // 1. Open file for reading in binary mode
+    FILE *f = fopen(filepath , "rb");
+    if (!f) {
+        perror("[PNG] Error opening file");
+        exit(EXIT_FAILURE);
+    }
+
+    // 2. Read and validate PNG signature
+    uint8_t signature[8];
+    fread(signature, 1, sizeof(signature), f);
+    if (memcmp(signature, PNG_SIG, sizeof(PNG_SIG)) != 0) {
+        perror("[PNG] Invalid PNG signature");
+        fclose(f);
+        exit(EXIT_FAILURE);
+    }
+
+    // 3. State variables for parsing 
+    uint8_t *compressed_data = NULL;
+    size_t compressed_size = 0;
+    u_int32_t width = 0, height = 0;
+    uint8_t color_type = 0; // 2 = RGB , 3 : Indexed , 0 : Grayscale
+
+    // Palette storage : max 256 colors , each color is 3 bytes (RGB)
+    // used only if color_type == 3
+    uint8_t palette[256][3];
+    memset(palette, 0, sizeof(palette));
+
+    // 4. Chunk parsing loop
+    // Read chunks until IEND is encountered
+    while(!feof(f)){
+        // 4.1 Read chunk length
+        uint32_t len = read_u32(f);
+        // 4.2 Read chunk type
+        char type[5] = {0};
+        if(fread(type, 1, 4, f) != 4) {
+            perror("[PNG] Error reading chunk type");
+            break; // EOF or read error
+        }
+        // 4.3 Process chunk based on type
+        // IHDR chunk
+        if (strcmp(type, "IHDR") == 0) {
+            IHDR ihdr;
+            fread(&ihdr, 1, sizeof(IHDR), f);
+            width = ntohl(ihdr.width);
+            height = ntohl(ihdr.height);
+            color_type = ihdr.color_type;
+            
+
+
+    }
+
+}
+}
