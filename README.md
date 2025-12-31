@@ -60,9 +60,10 @@ make clean  # Clean build files
 - `2` - Negative
 - `3` - Sepia
 
-**Example:**
+## Example
+
 ```bash
-./client data/input.png 3
+./client ~/data/input.png 3
 ```
 
 ## Testing
@@ -70,8 +71,11 @@ make clean  # Clean build files
 **Manual Test:**
 ```bash
 ./server 5
-./client data/test.bmp 1
+./client ~/data/test.bmp 1
 ```
+
+**Note:** Use full file paths starting with `~` (home directory) or absolute paths like `/home/username/data/image.png` for reliable image access.
+
 
 ## Technical Details
 

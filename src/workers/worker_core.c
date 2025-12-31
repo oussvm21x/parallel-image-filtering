@@ -23,7 +23,7 @@ void worker_core(filter_request_t req) {
 
     // 2.Apply filters (Multitheading)
     printf("[Worker %d] Applying filter %d\n", getpid(), req.filtre);
-    usleep(60000000);// Simulate processing time (60 seconds)
+
     switch (req.filtre) {
         case FILTER_GRAYSCALE:
             apply_grayscale(img);
