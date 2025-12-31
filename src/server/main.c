@@ -30,6 +30,10 @@ void handle_sigint(int sig) {
     (void)sig; 
     printf("Server shutting down...\n");
     server_running = 0 ;
+    // Unblock the sem_wait(sem_full) in the main loop
+    if (sem_full != NULL) {
+        sem_post(sem_full);
+    }
 }
 
 // Hanlder for SIGCHLD
@@ -114,6 +118,11 @@ int main(int argc, char* argv[]) {
             }
             perror("[Server] sem_wait(sem_full) failed") ;
             continue ;
+        }
+
+        // Check if we were woken up due to shutdown signal
+        if (server_running == 0) {
+            break;
         }
 
         // Lock the mutex to access shared memory
