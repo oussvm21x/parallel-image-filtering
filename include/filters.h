@@ -26,5 +26,7 @@ typedef struct {
 
 // Filter Prototypes
 void apply_grayscale(image_t *img);
+void apply_negative(image_t *img); 
+void apply_seppia(image_t *img);   
 
 #endif
