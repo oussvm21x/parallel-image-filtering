@@ -5,17 +5,34 @@
 #include <fcntl.h>      
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <protocol.h>
-#include <ipc_wrapper.h>
-#include <image_api.h>
+#include <semaphore.h>
+#include <signal.h>
+#include "protocol.h"
+#include "ipc_wrapper.h"
+#include "image_api.h"
 
+
+/* --- 1. Helpers --- */
+// Function to print usage instructions
 void print_usage(const char *prog_name) {
     printf("Usage: %s <image_path> <filter_id>\n", prog_name);
     printf("Filters:\n");
     printf("  1 - Grayscale\n");
     printf("  2 - Negative\n");
+    printf("  3 - Sepia tone\n");
 }
 
+// Signal handler for SIGINT to clean up resources
+void handle_sigint(int sig) {
+    (void)sig;
+    printf("[Client] Client Received SIGINT, cleaning up...\n");
+    if(strlen(FIFO_RESPONSE_TEMPLATE) > 0) {
+        char fifo_path[256];
+        snprintf(fifo_path, sizeof(fifo_path), FIFO_RESPONSE_TEMPLATE, getpid());
+        unlink(fifo_path);
+    }
+    exit(EXIT_FAILURE);
+}
 
 int main( int argc , char* argv[]) {
 
@@ -30,20 +47,53 @@ int main( int argc , char* argv[]) {
     const char* image_path = argv[1];
     int filter_id = atoi(argv[2]);
 
+    // 2. Register SIGINT handler
+    signal(SIGINT, handle_sigint);
+
     printf("[Client %d] Starting...\n", getpid());
 
-    // 2. Setup IPC mechanisms (shared memory and semaphore)
-    // The client only needs to get access to existing IPC mechanisms
-    // is_server = false (0)
-    filter_request_t* shm_ptr = ipc_get_shared_memory(SHM_NAME, sizeof(filter_request_t), 0) ;
-    sem_t * sem = ipc_get_semaphore("/sem_requests", 0) ;
+    // 3. Setup IPC mechanisms (shared memory and semaphore)
+    // 3.1 Connect to shared memory 
 
-    if (!shm_ptr || !sem) {
-        fprintf(stderr, "[Client %d] Fatal: Could not access IPC mechanisms\n", getpid());
-        return EXIT_FAILURE ;
+    // Map only the header part of the shared memory
+    // to read table size 
+    request_table_t * shm_ptr = ipc_get_shared_memory(SHM_NAME, sizeof(request_table_t), 0) ;
+    if(!shm_ptr){
+        perror("[Client] Error: Could not access Shared Memory");
+        exit(EXIT_FAILURE);
+    }
+    int table_size = shm_ptr->size ;
+    // Unmap the header part
+    ipc_close_shared_memory(SHM_NAME, shm_ptr, sizeof(request_table_t), 0 ) ;
+
+    // Now map the full shared memory
+    size_t shm_size = sizeof(request_table_t) + table_size * sizeof(filter_request_t) ;
+    shm_ptr = ipc_get_shared_memory(SHM_NAME, shm_size, 0) ;
+    if(!shm_ptr){
+        perror("[Client] Error: Could not access Shared Memory");
+        exit(EXIT_FAILURE);
     }
 
-    // 3. Prepare the fifo 
+    // 3.2 Connect to semaphore
+    sem_t *sem_mutex = ipc_get_semaphore(SEM_MUTEX_NAME, 0, 0) ;
+    if (!sem_mutex) {
+        perror("[Client] Error: Could not access Mutex Semaphore") ;
+        goto cleanup ;
+    }
+
+    sem_t *sem_empty = ipc_get_semaphore(SEM_EMPTY_NAME, 0, 0) ;
+    if (!sem_empty) {
+        perror("[Client] Error: Could not access Empty Semaphore") ;
+        goto cleanup ;
+    }
+
+    sem_t *sem_full = ipc_get_semaphore(SEM_FULL_NAME, 0, 0) ;
+    if (!sem_full) {
+        perror("[Client] Error: Could not access Full Semaphore") ;
+        goto cleanup ;
+    }
+
+    // 4. Prepare the fifo 
     char fifo_path[256];
     snprintf(fifo_path, sizeof(fifo_path), FIFO_RESPONSE_TEMPLATE, getpid());
 
@@ -56,35 +106,42 @@ int main( int argc , char* argv[]) {
     }
     printf("[Client %d] Created FIFO at %s\n", getpid(), fifo_path);
 
+    
     // 4. Send the request
-    int retries = 0 ; 
-    while(1) {
-        // Lock the semaphore
-        sem_wait(sem) ;
-        // Check if the server is busy
-        if (shm_ptr->pid == 0) {
-            // Prepare the request
-            shm_ptr->pid = getpid() ;
-            strncpy(shm_ptr->chemin, image_path, MAX_PATH_LENGTH - 1) ;
-            shm_ptr->chemin[MAX_PATH_LENGTH - 1] = '\0' ; // Ensure null-termination
-            shm_ptr->filtre = filter_id ;   
-
-            // Unlock the semaphore
-            sem_post(sem) ;
-            break;
-        }
-        // Unlock the semaphore
-        sem_post(sem) ;
-
-        // Server is busy, wait and retry
-        usleep(10000) ; // 10 ms
-        retries++ ;
-        if (retries % 100 == 0) {
-            printf("[Client %d] Waiting to send request... (retries: %d)\n", getpid(), retries);
-        }
+    // 4.1 Wait for an empty slot
+    if (sem_wait(sem_empty) == -1) {
+        perror("[Client] sem_wait(sem_empty) failed") ;
+        goto cleanup ;
     }
-    printf("[Client %d] Sent request to server.\n", getpid());
 
+    // 4.2 Lock the mutex to access shared memory
+    if (sem_wait(sem_mutex) == -1) {
+        perror("[Client] sem_wait(sem_mutex) failed") ;
+        // Release the empty semaphore before exiting
+        sem_post(sem_empty) ;
+        goto cleanup ;
+    }
+    // 4.3 Write the request to the circular buffer
+    int index = shm_ptr->in ;
+    shm_ptr->buffer[index].pid = getpid() ;
+    strncpy(shm_ptr->buffer[index].chemin, image_path, MAX_PATH_LENGTH - 1) ;
+    shm_ptr->buffer[index].chemin[MAX_PATH_LENGTH - 1] = '\0' ; // Ensure null-termination
+    shm_ptr->buffer[index].filtre = filter_id ;
+    // Initialize parameters to zero
+    for(int i = 0; i < 5; i++) {
+        shm_ptr->buffer[index].parametres[i] = 0 ;
+    }
+
+    // Update the in index
+    shm_ptr->in = (shm_ptr->in + 1) % shm_ptr->size ;
+
+    // 4.4 Unlock the mutex
+    sem_post(sem_mutex) ;
+
+    // 4.5 Signal that there is a new full slot
+    sem_post(sem_full) ;
+    printf("[Client %d] Sent request for image %s with filter %d\n", getpid(), image_path, filter_id);
+    
     // 5. Wait for the response
     int fifo_fd = open(fifo_path, O_RDONLY);
     if (fifo_fd == -1) {
@@ -162,13 +219,19 @@ int main( int argc , char* argv[]) {
         printf("[Client] Success! Image saved to %s\n", output_path);
     }
 
+    // 9. Cleanup
     free_image(img) ; 
     close(fifo_fd) ; 
+cleanup:
+
+
     unlink(fifo_path) ;
 
     //close IPC mechanisms
-    ipc_close_shared_memory(SHM_NAME, shm_ptr, sizeof(filter_request_t), 0  ) ;
-    ipc_close_semaphore("/sem_requests", sem, 0 ) ;
+    ipc_close_semaphore(SEM_MUTEX_NAME, sem_mutex, 0);
+    ipc_close_semaphore(SEM_EMPTY_NAME, sem_empty, 0);
+    ipc_close_semaphore(SEM_FULL_NAME, sem_full, 0);
+    ipc_close_shared_memory(SHM_NAME, shm_ptr, shm_size, 0);
 
 
     return 0 ;
