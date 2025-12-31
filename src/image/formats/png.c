@@ -5,6 +5,7 @@
 #include <arpa/inet.h> // Required for htonl/ntohl (Converts numbers between Host & Network Byte Order)
 #include <zlib.h>      // Standard library for the DEFLATE compression algorithm
 
+#pragma pack(1)
 
 /* ---1. Data Structures --- */
 typedef struct {
@@ -94,7 +95,13 @@ int save_png(const char *filepath , const image_t *img) {
     ihdr.width = htonl(img->width);
     ihdr.height = htonl(img->height);
     ihdr.bit_depth = 8; // Standard value , 8 bits per channel
-    ihdr.color_type = (img->channels == 3) ? 2 : 0; // 2 = Truecolor (RGB), 0 = Grayscale
+    if (img->channels == 3) {
+        ihdr.color_type = 2; // RGB
+    } else if (img->channels == 4) {
+        ihdr.color_type = 6; // RGBA 
+    } else {
+        ihdr.color_type = 0; // Grayscale
+    }
     ihdr.compression_method = 0; // Standard DEFLATE compression
     ihdr.filter_method = 0;      // Standard adaptive filtering
     ihdr.interlace_method = 0; // No interlacing
@@ -218,10 +225,231 @@ image_t* load_png(const char *filepath) {
             width = ntohl(ihdr.width);
             height = ntohl(ihdr.height);
             color_type = ihdr.color_type;
-            
+            // Skip CRC
+            fseek(f, 4, SEEK_CUR);
+        }
+        // PLTE chunk
+        else if (strcmp(type, "PLTE") == 0) {
+            int num_colors = len / 3;
+            if(num_colors > 256) num_colors = 256;
+            for (int i=0 ; i < num_colors ; i++) {
+                fread(palette[i], 1, 3, f);
+            }
+            // Skip CRC
+            fseek(f, 4, SEEK_CUR);
+        }
+        
+        // IDAT chunk 
+        else if (strcmp(type , "IDAT") == 0) {
 
+            // Reallocate buffer to hold compressed data
+            uint8_t *new_buffer = realloc(compressed_data, compressed_size + len);
+            if (!new_buffer) {
+                perror("[PNG] Error reallocating memory for compressed data");
+                free(compressed_data);
+                fclose(f);
+                exit(EXIT_FAILURE);
+            }
+
+            compressed_data = new_buffer;
+
+            // Read chunk data into buffer
+            if(fread(compressed_data + compressed_size, 1, len, f) != len) {
+                perror("[PNG] Error reading IDAT chunk data");
+                free(compressed_data);
+                fclose(f);
+                exit(EXIT_FAILURE);
+            }
+            compressed_size += len;
+
+            // Skip CRC
+            fseek(f, 4, SEEK_CUR);
+        }
+
+        // IEND chunk
+        else if (strcmp(type , "IEND") == 0) {
+            // End of PNG file
+            // Skip CRC
+            fseek(f, 4, SEEK_CUR);
+            break;
+        }
+        else {
+            // Unknown chunk , skip it
+            fseek(f, len + 4, SEEK_CUR); // Skip data + CRC
+        }
+
+    }
+    fclose(f);
+
+    // Validate that we have necessary data
+    if (width == 0 || height == 0 || compressed_data == NULL) {
+        perror("[PNG] Incomplete PNG data");
+        free(compressed_data);
+        exit(EXIT_FAILURE);
+    }
+
+    // 5. Decompress image data using zlib
+    // Determine channels based on color type
+    int channels = 0;
+    if (color_type == 2) {
+        channels = 3; // RGB
+    } else if (color_type == 3) {
+        channels = 1; // Indexed color
+    } 
+    else if(color_type == 6) {
+        channels = 4; // RGBA
+    }
+    else if (color_type == 0) {
+        channels = 1; // Grayscale
+    } else {
+        perror("[PNG] Unsupported color type");
+        free(compressed_data);
+        exit(EXIT_FAILURE);
+    }
+
+    // Calculate expected raw data size
+    // Bytes per row = (channels * width) + 1 (filter byte)
+    // Raw data size = ( bytes per row + 1 )* height
+    size_t row_bytes= (channels * width) ;
+    size_t raw_size = (row_bytes + 1) * height;
+    uint8_t *raw_data = (uint8_t *)malloc(raw_size);
+    if (!raw_data) {
+        perror("[PNG] Error allocating memory for raw image data");
+        free(compressed_data);
+        exit(EXIT_FAILURE);
+    }
+
+    // Decompress
+    // res returns Z_OK on success
+    int res = uncompress(raw_data, &raw_size, compressed_data, compressed_size);
+    free(compressed_data);
+
+    if (res != Z_OK) {
+        perror("[PNG] Error decompressing image data");
+        free(raw_data);
+        exit(EXIT_FAILURE);
+    }
+
+    // 6. Create image_t structure
+    size_t out_channels = (color_type == 3) ? 3 : channels; // Expand indexed to RGB
+    image_t *img = create_image(width, height, out_channels);
+    if (!img) {
+        perror("[PNG] Error creating image structure");
+        free(raw_data);
+        exit(EXIT_FAILURE);
+    }
+    
+    // 7. Reconstruction (Unfilter)
+    // we need two buffers because unfiltring often relies on the row above 
+    // to reconstruct the current row
+    uint8_t *prev_row = (uint8_t *)calloc(row_bytes, 1); // Initialize to zero
+    uint8_t *curr_row = (uint8_t *)malloc(row_bytes);
+    if (!prev_row || !curr_row) {
+        perror("[PNG] Error allocating memory for row buffers");
+        free_image(img);
+        free(prev_row);
+        free(curr_row);
+        free(raw_data);
+        exit(EXIT_FAILURE);
+    }
+
+    // 7.1 Process each row
+    for (size_t y=0 ; y < height ; y++) {
+        // 1. Locate the raw scanline
+        // In the raw data, each scanline starts with a filter byte
+        uint8_t *raw_scanline = raw_data + y * (row_bytes + 1);
+        uint8_t filter_type = raw_scanline[0];
+        uint8_t *data = raw_scanline + 1;
+
+        // 2. itterate over each byte in the scanline
+        for (size_t x=0 ; x < row_bytes ; x++) {
+            // Identify neighboring bytes
+            // Neighbors are bytes to the left and above the current byte
+            uint8_t left = (x >= channels) ? curr_row[x - channels] : 0;
+            uint8_t above = prev_row[x];
+            uint8_t upper_left = (x >= channels) ? prev_row[x - channels] : 0;
+
+            // The filtred value 
+            uint8_t filtred = data[x];
+            uint8_t recon = 0;
+
+            // 3. Apply the inverse filter based on filter type
+            switch (filter_type) {
+                case 0: // None
+                    // Data is raw , no filtering applied
+                    recon = filtred;
+                    break;
+                case 1: // Sub
+                    // Sub filter: recon = filtred + left
+                    recon = filtred + left;
+                    break;
+                case 2: // Up
+                    // Up filter: recon = filtred + above
+                    recon = filtred + above;
+                    break;
+                case 3: // Average
+                    // Average filter: recon = filtred + floor((left + above) / 2
+                    recon = filtred + ((left + above) / 2);
+                    break;
+                case 4: // Paeth
+                    // Paeth filter
+                    // Predictive filter using a linear function of the three neighboring bytes
+                    // recon = filtred + PaethPredictor(left, above, upper_left)
+                    {
+                        int p = left + above - upper_left;
+                        int pa = abs(p - left);
+                        int pb = abs(p - above);
+                        int pc = abs(p - upper_left);
+                        uint8_t paeth;
+                        if (pa <= pb && pa <= pc) {
+                            paeth = left;
+                        } else if (pb <= pc) {
+                            paeth = above;
+                        } else {
+                            paeth = upper_left;
+                        }
+                        recon = filtred + paeth;
+                    }
+                    break;
+                default:
+                    perror("[PNG] Unsupported filter type");
+                    free_image(img);
+                    free(prev_row);
+                    free(curr_row);
+                    free(raw_data);
+                    exit(EXIT_FAILURE);
+            }
+            curr_row[x] = recon;
+
+        }
+
+        // 4. Handle color types
+        // Case 1 : Indexed color (color_type == 3)
+        if (color_type == 3) {
+            for (size_t x=0 ; x < width ; x++) {
+                uint8_t index = curr_row[x];
+                img->data[y * img->row_stride + x * 3 + 0] = palette[index][0]; // R
+                img->data[y * img->row_stride + x * 3 + 1] = palette[index][1]; // G
+                img->data[y * img->row_stride + x * 3 + 2] = palette[index][2]; // B
+            }
+        }
+        // Case 2 : Direct color (RGB or Grayscale)
+        else {
+            memcpy(img->data + y * img->row_stride, curr_row, row_bytes);
+        }
+
+        // 5. Swap current and previous row buffers
+        memcpy(prev_row, curr_row, row_bytes);
 
     }
 
+    // 8. Cleanup
+    free(raw_data);
+    free(prev_row);
+    free(curr_row);
+    printf("[PNG] Image loaded successfully: %s\n", filepath);
+    return img; 
+
+
 }
-}
+

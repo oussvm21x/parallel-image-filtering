@@ -17,8 +17,6 @@ image_t* load_image(const char* filepath) {
     const char* ext = get_file_extension(filepath);
     if (strcmp(ext, "bmp") == 0) {
         return load_bmp(filepath);
-    } else if (strcmp(ext, "jpg") == 0 || strcmp(ext, "jpeg") == 0) {
-        return load_jpeg(filepath);
     } else if (strcmp(ext, "png") == 0) {
         return load_png(filepath);
     } else {
@@ -31,8 +29,6 @@ int save_image(const char* filepath, const image_t* img) {
     const char* ext = get_file_extension(filepath);
     if (strcmp(ext, "bmp") == 0) {
         return save_bmp(filepath, img);
-    } else if (strcmp(ext, "jpg") == 0 || strcmp(ext, "jpeg") == 0) {
-        return save_jpeg(filepath, img);
     } else if (strcmp(ext, "png") == 0) {
         return save_png(filepath, img);
     } else {
