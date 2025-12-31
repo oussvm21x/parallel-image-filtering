@@ -68,7 +68,7 @@ void write_bmp_header ( FILE *f , int w , int h , int stride ) {
 
 }
 
-/* --- 3. Image API --- */
+/* --- 3. BMP Loading and Saving Functions ---*/
 
 /* --- 3.1 Load image --- */
 image_t* load_bmp(const char* filepath) {
