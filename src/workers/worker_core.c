@@ -4,6 +4,7 @@
 #include <fcntl.h>      
 #include <sys/stat.h>
 #include <string.h>
+#include <signal.h>
 
 #include "protocol.h"
 #include "image_api.h"
@@ -17,8 +18,9 @@ void worker_core(filter_request_t req) {
     // 1. Load the image 
     image_t *img = load_image(req.chemin);
     if (img == NULL) {
-        perror("[Worker] Failed to load image");
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "[Worker] Failed to load image\n");
+        kill(req.pid, SIGTERM);
+        return;
     }
 
     // 2.Apply filters (Multitheading)
@@ -35,6 +37,11 @@ void worker_core(filter_request_t req) {
         case FILTER_SEPPIA :
             apply_seppia(img) ;
             break ;
+        default:
+            fprintf(stderr, "[Worker] Invalid filter: %d\n", req.filtre);
+            free_image(img);
+            kill(req.pid, SIGTERM);
+            return;
     }
 
     // 3. Open response FIFO (Pipe) 
@@ -42,9 +49,10 @@ void worker_core(filter_request_t req) {
     snprintf(fifo_name, sizeof(fifo_name), FIFO_RESPONSE_TEMPLATE, req.pid);
     int fd = open(fifo_name, O_WRONLY);
     if (fd == -1) {
-        perror("[Worker] Failed to open response FIFO");
+        fprintf(stderr, "[Worker] Failed to open response FIFO\n");
         free_image(img);
-        exit(EXIT_FAILURE);
+        kill(req.pid, SIGTERM);
+        return;
     }
 
     // 4. Send Header (width, height, channels)
@@ -56,8 +64,11 @@ void worker_core(filter_request_t req) {
     size_t data_size = img->row_stride * img->height;
     ssize_t sent_bytes = write(fd, img->data, data_size);
     if (sent_bytes != (ssize_t)data_size) {
-        perror("[Worker] Failed to send complete image data");
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "[Worker] Failed to send complete image data\n");
+        close(fd);
+        free_image(img);
+        kill(req.pid, SIGTERM);
+        return;
     }
     printf("[Worker %d] Sent %zd bytes of image data\n", getpid(), sent_bytes);
     // 6. Cleanup

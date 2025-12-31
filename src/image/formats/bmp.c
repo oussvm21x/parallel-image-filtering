@@ -75,7 +75,7 @@ image_t* load_bmp(const char* filepath) {
     FILE* f = fopen(filepath, "rb");
     if (!f) {
         perror("[BMP] Error opening file");
-        exit(EXIT_FAILURE);
+        return NULL;
     }
 
     BMPHeader header;
@@ -86,20 +86,20 @@ image_t* load_bmp(const char* filepath) {
     fread(&infoHeader, sizeof(BMPInfoHeader), 1, f) != 1) {
         perror("[BMP] Error reading BMP header");
         fclose(f);
-        exit(EXIT_FAILURE);
+        return NULL;
     }
 
     // 2. Validate BMP format
     if (header.signature != 0x4D42) {
         perror("[BMP] Invalid BMP signature");
         fclose(f);
-        exit(EXIT_FAILURE);
+        return NULL;
     }
 
     if (infoHeader.bitsPerPixel != 24) {
         perror("[BMP] Unsupported bits per pixel");
         fclose(f);
-        exit(EXIT_FAILURE);
+        return NULL;
     }
     
     // 3. Allocate image
@@ -111,7 +111,7 @@ image_t* load_bmp(const char* filepath) {
     if (!img) {
         perror("[BMP] Error allocating image");
         fclose(f);
-        exit(EXIT_FAILURE);
+        return NULL;
     }
 
     // 4. Read pixel data

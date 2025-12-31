@@ -82,7 +82,7 @@ int save_png(const char *filepath , const image_t *img) {
     FILE *f = fopen(filepath , "wb");
     if (!f) {
         perror("[PNG] Error opening file for writing");
-        exit(EXIT_FAILURE);
+        return -1;
     }
 
     // 2. Write PNG signature
@@ -121,7 +121,7 @@ int save_png(const char *filepath , const image_t *img) {
     if (!raw_data) {
         perror("[PNG] Error allocating memory for raw image data");
         fclose(f);
-        exit(EXIT_FAILURE);
+        return -1;
     }
 
     for (size_t y=0 ; y < img->height ; y++) {
@@ -145,7 +145,7 @@ int save_png(const char *filepath , const image_t *img) {
         perror("[PNG] Error allocating memory for compressed data");
         free(raw_data);
         fclose(f);
-        exit(EXIT_FAILURE);
+        return -1;
     }
 
     // Compress using zlib's compress function
@@ -154,7 +154,7 @@ int save_png(const char *filepath , const image_t *img) {
         free(raw_data);
         free(compressed_data);
         fclose(f);
-        exit(EXIT_FAILURE);
+        return -1;
     }
 
     // free raw image data as it's no longer needed
@@ -183,7 +183,7 @@ image_t* load_png(const char *filepath) {
     FILE *f = fopen(filepath , "rb");
     if (!f) {
         perror("[PNG] Error opening file");
-        exit(EXIT_FAILURE);
+        return NULL;
     }
 
     // 2. Read and validate PNG signature
@@ -192,7 +192,7 @@ image_t* load_png(const char *filepath) {
     if (memcmp(signature, PNG_SIG, sizeof(PNG_SIG)) != 0) {
         perror("[PNG] Invalid PNG signature");
         fclose(f);
-        exit(EXIT_FAILURE);
+        return NULL;
     }
 
     // 3. State variables for parsing 
@@ -248,7 +248,7 @@ image_t* load_png(const char *filepath) {
                 perror("[PNG] Error reallocating memory for compressed data");
                 free(compressed_data);
                 fclose(f);
-                exit(EXIT_FAILURE);
+                return NULL;
             }
 
             compressed_data = new_buffer;
@@ -258,7 +258,7 @@ image_t* load_png(const char *filepath) {
                 perror("[PNG] Error reading IDAT chunk data");
                 free(compressed_data);
                 fclose(f);
-                exit(EXIT_FAILURE);
+                return NULL;
             }
             compressed_size += len;
 
@@ -285,7 +285,7 @@ image_t* load_png(const char *filepath) {
     if (width == 0 || height == 0 || compressed_data == NULL) {
         perror("[PNG] Incomplete PNG data");
         free(compressed_data);
-        exit(EXIT_FAILURE);
+        return NULL;
     }
 
     // 5. Decompress image data using zlib
@@ -304,7 +304,7 @@ image_t* load_png(const char *filepath) {
     } else {
         perror("[PNG] Unsupported color type");
         free(compressed_data);
-        exit(EXIT_FAILURE);
+        return NULL;
     }
 
     // Calculate expected raw data size
@@ -316,7 +316,7 @@ image_t* load_png(const char *filepath) {
     if (!raw_data) {
         perror("[PNG] Error allocating memory for raw image data");
         free(compressed_data);
-        exit(EXIT_FAILURE);
+        return NULL;
     }
 
     // Decompress
@@ -327,7 +327,7 @@ image_t* load_png(const char *filepath) {
     if (res != Z_OK) {
         perror("[PNG] Error decompressing image data");
         free(raw_data);
-        exit(EXIT_FAILURE);
+        return NULL;
     }
 
     // 6. Create image_t structure
@@ -336,7 +336,7 @@ image_t* load_png(const char *filepath) {
     if (!img) {
         perror("[PNG] Error creating image structure");
         free(raw_data);
-        exit(EXIT_FAILURE);
+        return NULL;
     }
     
     // 7. Reconstruction (Unfilter)
@@ -350,7 +350,7 @@ image_t* load_png(const char *filepath) {
         free(prev_row);
         free(curr_row);
         free(raw_data);
-        exit(EXIT_FAILURE);
+        return NULL;
     }
 
     // 7.1 Process each row
@@ -417,7 +417,7 @@ image_t* load_png(const char *filepath) {
                     free(prev_row);
                     free(curr_row);
                     free(raw_data);
-                    exit(EXIT_FAILURE);
+                    return NULL;
             }
             curr_row[x] = recon;
 

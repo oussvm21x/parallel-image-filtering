@@ -25,6 +25,11 @@ void print_usage(const char *prog_name) {
 // Signal handler for SIGINT to clean up resources
 void handle_sigint(int sig) {
     (void)sig;
+    // Check if the error come from the user(Ctrl+C) or the workers
+    if(sig == SIGTERM){
+        printf("[Client] Received SIGTERM, exiting...\n");
+        exit(EXIT_FAILURE);
+    }
     printf("[Client] Client Received SIGINT, cleaning up...\n");
     if(strlen(FIFO_RESPONSE_TEMPLATE) > 0) {
         char fifo_path[256];
@@ -47,8 +52,9 @@ int main( int argc , char* argv[]) {
     const char* image_path = argv[1];
     int filter_id = atoi(argv[2]);
 
-    // 2. Register SIGINT handler
+    // 2. Register signlas handler 
     signal(SIGINT, handle_sigint);
+    signal(SIGTERM, handle_sigint);
 
     printf("[Client %d] Starting...\n", getpid());
 
