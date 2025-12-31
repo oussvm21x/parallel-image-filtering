@@ -12,6 +12,15 @@ This project implements a high-performance **Producer-Consumer** system for para
 - **Filters:** Grayscale, Negative, Sepia
 - **Robustness:** Graceful shutdown (SIGINT), zombie reaping (SIGCHLD), IPC cleanup
 
+## Dependencies
+```bash
+# Ubuntu/Debian
+sudo apt-get install build-essential zlib1g-dev
+
+# macOS
+brew install zlib
+```
+
 ## Project Structure
 ```
 ├── src/
@@ -63,7 +72,6 @@ make clean  # Clean build files
 ./server 5
 ./client data/test.bmp 1
 ```
-
 
 ## Technical Details
 
