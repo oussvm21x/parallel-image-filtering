@@ -365,9 +365,9 @@ image_t* load_png(const char *filepath) {
         for (size_t x=0 ; x < row_bytes ; x++) {
             // Identify neighboring bytes
             // Neighbors are bytes to the left and above the current byte
-            uint8_t left = (x >= channels) ? curr_row[x - channels] : 0;
+            uint8_t left = (x >= (size_t)channels) ? curr_row[x - channels] : 0;
             uint8_t above = prev_row[x];
-            uint8_t upper_left = (x >= channels) ? prev_row[x - channels] : 0;
+            uint8_t upper_left = (x >= (size_t)channels) ? prev_row[x - channels] : 0;
 
             // The filtred value 
             uint8_t filtred = data[x];
