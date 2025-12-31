@@ -8,13 +8,21 @@
 #include <sys/stat.h>   // for S_IRUSR, S_IWUSR
 
 
-sem_t* ipc_get_semaphore(const char* name, bool is_server) {
+sem_t* ipc_get_semaphore(const char* name, unsigned int value, bool is_server) {
 
     sem_t* sem ;
 
     if(is_server) {
+        // Reset and clean any existing semaphore with the same name
+        sem_unlink(name) ;
+
         // Create the semaphore with initial value 1
-        sem = sem_open(name , O_CREAT , 0666 , 1) ;
+        sem = sem_open(name , O_CREAT , 0666 , value) ;
+
+        if(sem == SEM_FAILED) {
+            perror("[IPC] sem_open (create) failed") ;
+            exit(EXIT_FAILURE) ;
+        }   
     }
     else {
         // Open the existing semaphore by client

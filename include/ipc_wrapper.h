@@ -40,11 +40,12 @@ void ipc_close_shared_memory(const char* name, void* addr, size_t size , bool is
 * A Wrapper function to create or get a named semaphore.
 * Parameters:
 *   - name: Name of the semaphore.
+*   - value: Initial value for the semaphore (used only if is_server is true).
 *   - is_server: If true, create the semaphore and initialize it; if false, just get it.
 * Returns:
 *   - Pointer to the semaphore, or NULL on failure.
 */  
-sem_t* ipc_get_semaphore(const char* name, bool is_server) ;
+sem_t* ipc_get_semaphore(const char* name, unsigned int value, bool is_server) ;
 
 
 /*
